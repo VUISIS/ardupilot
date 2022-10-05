@@ -28,6 +28,7 @@ vehicle-related headers and fails the build if they do.
 """
 import os
 import re
+from tty import CFLAG
 
 from waflib import Errors, Task, Utils
 from waflib.Configure import conf
@@ -110,7 +111,15 @@ def ap_library(bld, library, vehicle):
     if not library_dir:
         bld.fatal('ap_library: %s not found' % library)
 
-    src = library_dir.ant_glob(wildcard)
+    if library == "AP_HAL_ChibiOS":
+        src = library_dir.ant_glob(wildcard, excl=['Encryption.cpp', 'EncryptedUARTDriver.cpp', 'UnencryptedUARTDriver.cpp'])
+        if bld.env.USE_ENCRYPTION: 
+            src += [bld.bldnode.find_or_declare(library_dir.abspath() + '/Encryption.cpp')]
+            src += [bld.bldnode.find_or_declare(library_dir.abspath() + '/EncryptedUARTDriver.cpp')]
+        elif not bld.env.USE_ENCRYPTION:
+            src += [bld.bldnode.find_or_declare(library_dir.abspath() + '/UnencryptedUARTDriver.cpp')]
+    else:
+        src = library_dir.ant_glob(wildcard)
 
     # allow for dynamically generated sources in a library that inherit the
     # dependencies and includes
@@ -124,7 +133,7 @@ def ap_library(bld, library, vehicle):
         kw.update(
             name=_common_tgen_name(library),
             source=[s for s in src if not _depends_on_vehicle(bld, s)],
-            idx=0,
+            idx=0
         )
         bld.objects(**kw)
 
@@ -140,7 +149,7 @@ def ap_library(bld, library, vehicle):
             name=_vehicle_tgen_name(library, vehicle),
             source=source,
             defines=ap.get_legacy_defines(vehicle, bld),
-            idx=_vehicle_index(vehicle),
+            idx=_vehicle_index(vehicle)
         )
         bld.objects(**kw)
 

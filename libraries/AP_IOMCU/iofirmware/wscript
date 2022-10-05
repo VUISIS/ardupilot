@@ -2,22 +2,46 @@
 # encoding: utf-8
 
 def build(bld):
-    bld.ap_stlib(
-        name= 'iofirmware_libs',
-        ap_vehicle='iofirmware',
-        ap_libraries= [
-        'AP_Common',
-        'AP_HAL',
-        'AP_HAL_Empty',
-        'AP_Math',
-        'AP_RCProtocol',
-        'AP_BoardConfig',
-        'AP_SBusOut'
-        ],
-        exclude_src=[
-            'libraries/AP_HAL_ChibiOS/Storage.cpp'
-        ]
-    )
+    if bld.env.USE_ENCRYPTION:
+        bld.ap_stlib(
+            name= 'iofirmware_libs',
+            ap_vehicle='iofirmware',
+            ap_libraries= [
+            'AP_Common',
+            'AP_HAL',
+            'AP_HAL_Empty',
+            'AP_Math',
+            'AP_RCProtocol',
+            'AP_BoardConfig',
+            'AP_SBusOut'
+            ],
+            exclude_src=[
+                'libraries/AP_HAL_ChibiOS/Storage.cpp',
+                'libraries/AP_HAL_ChibiOS/UnencryptedUARTDriver.cpp',
+                'libraries/AP_HAL_ChibiOS/UnencryptedUARTDriver.h'
+            ]
+        )
+    else:
+        bld.ap_stlib(
+            name= 'iofirmware_libs',
+            ap_vehicle='iofirmware',
+            ap_libraries= [
+            'AP_Common',
+            'AP_HAL',
+            'AP_HAL_Empty',
+            'AP_Math',
+            'AP_RCProtocol',
+            'AP_BoardConfig',
+            'AP_SBusOut'
+            ],
+            exclude_src=[
+                'libraries/AP_HAL_ChibiOS/Storage.cpp',
+                'libraries/AP_HAL_ChibiOS/Encryption.cpp',
+                'libraries/AP_HAL_ChibiOS/Encryption.h'
+                'libraries/AP_HAL_ChibiOS/EncryptedUARTDriver.cpp',
+                'libraries/AP_HAL_ChibiOS/EncryptedUARTDriver.h'
+            ]
+        )
 
     bld.ap_program(
         program_name='iofirmware_lowpolh',

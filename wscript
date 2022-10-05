@@ -233,6 +233,10 @@ submodules at specific revisions.
                  default=False,
                  help="Enables firmware ID checking on boot")
 
+    g.add_option('--encryption', action='store_true',
+                 default=False,
+                 help="Enables mavlink message encryption.")
+
     g = opt.ap_groups['linux']
 
     linux_options = ('--prefix', '--destdir', '--bindir', '--libdir')
@@ -401,6 +405,9 @@ def configure(cfg):
     cfg.env.ENABLE_MALLOC_GUARD = cfg.options.enable_malloc_guard
     cfg.env.ENABLE_STATS = cfg.options.enable_stats
     cfg.env.SAVE_TEMPS = cfg.options.save_temps
+    cfg.env.USE_ENCRYPTION = cfg.options.encryption
+
+    cfg.msg('Message Encryption', 'enabled' if cfg.options.encryption else 'disabled')
 
     cfg.env.HWDEF_EXTRA = cfg.options.extra_hwdef
     if cfg.env.HWDEF_EXTRA:
@@ -410,6 +417,8 @@ def configure(cfg):
 
     # Allow to differentiate our build from the make build
     cfg.define('WAF_BUILD', 1)
+
+    cfg.define("ENCRYPTION", cfg.options.encryption)
 
     cfg.msg('Autoconfiguration', 'enabled' if cfg.options.autoconfig else 'disabled')
 
@@ -746,6 +755,7 @@ def _load_pre_build(bld):
     '''allow for a pre_build() function in build modules'''
     if bld.cmd == 'clean':
         return
+
     brd = bld.get_board()
     if bld.env.AP_PERIPH:
         dsdlc_gen_path = bld.bldnode.make_node('modules/DroneCAN/libcanard/dsdlc_generated/include').abspath()
@@ -767,7 +777,7 @@ def build(bld):
 
     bld.env.AP_LIBRARIES_OBJECTS_KW.update(
         use=['mavlink'],
-        cxxflags=['-include', 'ap_config.h'],
+        cxxflags=['-include', 'ap_config.h']
     )
 
     _load_pre_build(bld)

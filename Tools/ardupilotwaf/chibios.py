@@ -453,6 +453,8 @@ def load_env_vars(env):
         env.CHIBIOS_BUILD_FLAGS += ' ENABLE_MALLOC_GUARD=yes'
     if env.ENABLE_STATS:
         env.CHIBIOS_BUILD_FLAGS += ' ENABLE_STATS=yes'
+    if env.USE_ENCRYPTION:
+        env.HAL_USE_CRY = 'TRUE'
 
 
 def setup_optimization(env):

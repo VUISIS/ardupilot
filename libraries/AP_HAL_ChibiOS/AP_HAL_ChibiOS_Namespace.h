@@ -28,7 +28,11 @@ namespace ChibiOS {
     class QSPIDevice;
     class QSPIDeviceManager;
     class Storage;
-    class UARTDriver;
+#ifdef ENCRYPTION
+    class EncryptedUARTDriver;
+#else
+    class UnencryptedUARTDriver;
+#endif
     class Util;
     class Shared_DMA;
     class SoftSigReader;
