@@ -364,6 +364,11 @@ configuration in order to save typing.
 	    default=None,
 	    help='Extra hwdef.dat file for custom build.')
 
+    g.add_option('--encryption',
+	    action='store_true',
+	    default=False,
+	    help='Add XOR encryption to mavlink messages.')
+
     g.add_option('--assert-cc-version',
                  default=None,
                  help='fail configure if not using the specified gcc version')
@@ -425,6 +430,9 @@ def configure(cfg):
         cfg.env.HWDEF_EXTRA = os.path.abspath(cfg.env.HWDEF_EXTRA)
 
     cfg.env.OPTIONS = cfg.options.__dict__
+
+    if cfg.options.encryption:
+        cfg.env.CXXFLAGS += ["-DENCRYPTION"]
 
     # Allow to differentiate our build from the make build
     cfg.define('WAF_BUILD', 1)

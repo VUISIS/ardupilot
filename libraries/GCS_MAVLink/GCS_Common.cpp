@@ -60,6 +60,10 @@
 #include "MissionItemProtocol_Rally.h"
 #include "MissionItemProtocol_Fence.h"
 
+#if ENCRYPTION
+#include <Encryption/xor.h>
+#endif
+
 #include <stdio.h>
 
 #if HAL_RCINPUT_WITH_AP_RADIO
@@ -2622,6 +2626,22 @@ MAV_STATE GCS_MAVLINK::system_status() const
  */
 void GCS_MAVLINK::send_heartbeat() const
 {
+#if ENCRYPTION
+    mavlink_heartbeat_t packet;
+    packet.custom_mode = gcs().custom_mode();
+    packet.type = gcs().frame_type();
+    packet.autopilot = 3;
+    packet.base_mode = base_mode();
+    packet.system_status = system_status();
+    packet.mavlink_version = 3;
+
+    char buf[sizeof(packet)];
+    memcpy(buf, &packet, sizeof(packet));
+
+    xor_crypto(buf, 9);
+
+    _mav_finalize_message_chan_send(chan, 0, buf, 9, 9,50);
+#else
     mavlink_msg_heartbeat_send(
         chan,
         gcs().frame_type(),
@@ -2629,6 +2649,7 @@ void GCS_MAVLINK::send_heartbeat() const
         base_mode(),
         gcs().custom_mode(),
         system_status());
+#endif
 }
 
 MAV_RESULT GCS_MAVLINK::handle_command_do_aux_function(const mavlink_command_long_t &packet)

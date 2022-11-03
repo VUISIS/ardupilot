@@ -321,7 +321,7 @@ def do_build(opts, frame_options):
 
     configure_target = frame_options.get('configure_target', 'sitl')
 
-    cmd_configure = [waf_light, "configure", "--board", configure_target]
+    cmd_configure = [waf_light, "configure", "--board", configure_target, "--encryption"]
     if opts.debug:
         cmd_configure.append("--debug")
 
