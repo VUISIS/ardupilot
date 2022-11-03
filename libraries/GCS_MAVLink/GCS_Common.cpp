@@ -193,7 +193,19 @@ void GCS_MAVLINK::send_meminfo(void)
 {
     unsigned __brkval = 0;
     uint32_t memory = hal.util->available_memory();
+
+#if ENCRYPTION
+    char buf[MAVLINK_MSG_ID_MEMINFO_LEN];
+    _mav_put_uint16_t(buf, 0, __brkval);
+    _mav_put_uint16_t(buf, 2, MIN(memory, 0xFFFFU));
+    _mav_put_uint32_t(buf, 4, memory);
+
+    xor_crypto(buf);
+
+    _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_MEMINFO, buf, MAVLINK_MSG_ID_MEMINFO_MIN_LEN, MAVLINK_MSG_ID_MEMINFO_LEN, MAVLINK_MSG_ID_MEMINFO_CRC);
+#else
     mavlink_msg_meminfo_send(chan, __brkval, MIN(memory, 0xFFFFU), memory);
+#endif
 }
 
 // report power supply status
@@ -203,10 +215,21 @@ void GCS_MAVLINK::send_power_status(void)
         // avoid unnecessary errors being reported to user
         return;
     }
+#if ENCRYPTION
+    char buf[MAVLINK_MSG_ID_POWER_STATUS_LEN];
+    _mav_put_uint16_t(buf, 0, hal.analogin->board_voltage() * 1000);
+    _mav_put_uint16_t(buf, 2, hal.analogin->servorail_voltage() * 1000);
+    _mav_put_uint16_t(buf, 4, hal.analogin->power_status_flags());
+
+    xor_crypto(buf);
+
+    _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_POWER_STATUS, buf, MAVLINK_MSG_ID_POWER_STATUS_MIN_LEN, MAVLINK_MSG_ID_POWER_STATUS_LEN, MAVLINK_MSG_ID_POWER_STATUS_CRC);
+#else
     mavlink_msg_power_status_send(chan,
                                   hal.analogin->board_voltage() * 1000,
                                   hal.analogin->servorail_voltage() * 1000,
                                   hal.analogin->power_status_flags());
+#endif
 }
 
 #if HAL_WITH_MCU_MONITORING
@@ -217,12 +240,25 @@ void GCS_MAVLINK::send_mcu_status(void)
         // avoid unnecessary errors being reported to user
         return;
     }
+#if ENCRYPTION
+    char buf[MAVLINK_MSG_ID_MCU_STATUS_LEN];
+    _mav_put_int16_t(buf, 0, hal.analogin->mcu_temperature() * 100);
+    _mav_put_uint16_t(buf, 2, hal.analogin->mcu_voltage() * 1000);
+    _mav_put_uint16_t(buf, 4, hal.analogin->mcu_voltage_min() * 1000);
+    _mav_put_uint16_t(buf, 6, hal.analogin->mcu_voltage_max() * 1000);
+    _mav_put_uint8_t(buf, 8, 0);
+
+    xor_crypto(buf);
+
+    _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_MCU_STATUS, buf, MAVLINK_MSG_ID_MCU_STATUS_MIN_LEN, MAVLINK_MSG_ID_MCU_STATUS_LEN, MAVLINK_MSG_ID_MCU_STATUS_CRC);
+#else
     mavlink_msg_mcu_status_send(chan,
                                 0, // only one MCU
                                 hal.analogin->mcu_temperature() * 100,
                                 hal.analogin->mcu_voltage() * 1000,
                                 hal.analogin->mcu_voltage_min() * 1000,
                                 hal.analogin->mcu_voltage_max() * 1000);
+#endif
 }
 #endif
 
@@ -341,6 +377,27 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
         time_remaining = 0;
     }
 
+#if ENCRYPTION
+    char buf[MAVLINK_MSG_ID_BATTERY_STATUS_LEN];
+    _mav_put_int32_t(buf, 0, consumed_mah);
+    _mav_put_int32_t(buf, 4, consumed_wh);
+    _mav_put_int16_t(buf, 8, got_temperature ? ((int16_t) (temp * 100)) : INT16_MAX);
+    _mav_put_int16_t(buf, 30, current);
+    _mav_put_uint8_t(buf, 32, instance);
+    _mav_put_uint8_t(buf, 33, MAV_BATTERY_FUNCTION_UNKNOWN);
+    _mav_put_uint8_t(buf, 34, MAV_BATTERY_TYPE_UNKNOWN);
+    _mav_put_int8_t(buf, 35, percentage);
+    _mav_put_int32_t(buf, 36, time_remaining);
+    _mav_put_uint8_t(buf, 40, battery.get_mavlink_charge_state(instance));
+    _mav_put_uint8_t(buf, 49, 0);
+    _mav_put_uint32_t(buf, 50, battery.get_mavlink_fault_bitmask(instance));
+    _mav_put_uint16_t_array(buf, 10, cell_mvolts, 10);
+    _mav_put_uint16_t_array(buf, 41, cell_mvolts_ext, 4);
+
+    xor_crypto(buf);
+
+    _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_BATTERY_STATUS, buf, MAVLINK_MSG_ID_BATTERY_STATUS_MIN_LEN, MAVLINK_MSG_ID_BATTERY_STATUS_LEN, MAVLINK_MSG_ID_BATTERY_STATUS_CRC);
+#else
     mavlink_msg_battery_status_send(chan,
                                     instance, // id
                                     MAV_BATTERY_FUNCTION_UNKNOWN, // function
@@ -356,6 +413,7 @@ void GCS_MAVLINK::send_battery_status(const uint8_t instance) const
                                     cell_mvolts_ext, // Cell 11..14 voltages
                                     0, // battery mode
                                     battery.get_mavlink_fault_bitmask(instance));   // fault_bitmask
+#endif
 #else
     (void)instance;
 #endif
@@ -399,6 +457,25 @@ void GCS_MAVLINK::send_distance_sensor(const AP_RangeFinder_Backend *sensor, con
         quality = 0;
     }
 
+#if ENCRYPTION
+    char buf[MAVLINK_MSG_ID_DISTANCE_SENSOR_LEN];
+    _mav_put_uint32_t(buf, 0, AP_HAL::millis());
+    _mav_put_uint16_t(buf, 4, sensor->min_distance_cm());
+    _mav_put_uint16_t(buf, 6, sensor->max_distance_cm());
+    _mav_put_uint16_t(buf, 8, sensor->distance_cm());
+    _mav_put_uint8_t(buf, 10, sensor->get_mav_distance_sensor_type());
+    _mav_put_uint8_t(buf, 11, instance);
+    _mav_put_uint8_t(buf, 12, sensor->orientation());
+    _mav_put_uint8_t(buf, 13, 0);
+    _mav_put_float(buf, 14, 0);
+    _mav_put_float(buf, 18, 0);
+    _mav_put_uint8_t(buf, 38, quality);
+    _mav_put_float_array(buf, 22, (const float *)nullptr, 4);
+
+    xor_crypto(buf);
+
+    _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_DISTANCE_SENSOR, buf, MAVLINK_MSG_ID_DISTANCE_SENSOR_MIN_LEN, MAVLINK_MSG_ID_DISTANCE_SENSOR_LEN, MAVLINK_MSG_ID_DISTANCE_SENSOR_CRC);
+#else
     mavlink_msg_distance_sensor_send(
         chan,
         AP_HAL::millis(),                        // time since system boot TODO: take time of measurement
@@ -413,6 +490,7 @@ void GCS_MAVLINK::send_distance_sensor(const AP_RangeFinder_Backend *sensor, con
         0,                                       // vertical FOV
         (const float *)nullptr,                  // quaternion of sensor orientation for MAV_SENSOR_ROTATION_CUSTOM
         quality);                                // Signal quality of the sensor. 0 = unknown/unset signal quality, 1 = invalid signal, 100 = perfect signal.
+#endif
 }
 // send any and all distance_sensor messages.  This starts by sending
 // any distance sensors not used by a Proximity sensor, then sends the
@@ -470,10 +548,21 @@ void GCS_MAVLINK::send_rangefinder() const
     if (s == nullptr) {
         return;
     }
+
+#if ENCRYPTION
+    char buf[MAVLINK_MSG_ID_RANGEFINDER_LEN];
+    _mav_put_float(buf, 0, s->distance());
+    _mav_put_float(buf, 4, s->voltage_mv() * 0.001f);
+
+    xor_crypto(buf);
+
+    _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_RANGEFINDER, buf, MAVLINK_MSG_ID_RANGEFINDER_MIN_LEN, MAVLINK_MSG_ID_RANGEFINDER_LEN, MAVLINK_MSG_ID_RANGEFINDER_CRC);
+#else
     mavlink_msg_rangefinder_send(
             chan,
             s->distance(),
             s->voltage_mv() * 0.001f);
+#endif
 }
 
 #if HAL_PROXIMITY_ENABLED
@@ -2635,12 +2724,12 @@ void GCS_MAVLINK::send_heartbeat() const
     packet.system_status = system_status();
     packet.mavlink_version = 3;
 
-    char buf[sizeof(packet)];
+    char buf[sizeof(mavlink_heartbeat_t)];
     memcpy(buf, &packet, sizeof(packet));
 
-    xor_crypto(buf, 9);
+    xor_crypto(buf);
 
-    _mav_finalize_message_chan_send(chan, 0, buf, 9, 9,50);
+    _mav_finalize_message_chan_send(chan, 0, buf, 9, 9, 50);
 #else
     mavlink_msg_heartbeat_send(
         chan,

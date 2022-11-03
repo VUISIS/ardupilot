@@ -432,7 +432,7 @@ def configure(cfg):
     cfg.env.OPTIONS = cfg.options.__dict__
 
     if cfg.options.encryption:
-        cfg.env.CXXFLAGS += ["-DENCRYPTION"]
+        cfg.define('ENCRYPTION', 1)
 
     # Allow to differentiate our build from the make build
     cfg.define('WAF_BUILD', 1)
