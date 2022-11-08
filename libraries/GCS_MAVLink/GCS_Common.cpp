@@ -592,6 +592,25 @@ void GCS_MAVLINK::send_proximity()
                     // need to send an invalid one.
                     continue;
                 }
+#if ENCRYPTION
+                char buf[MAVLINK_MSG_ID_DISTANCE_SENSOR_LEN];
+                _mav_put_uint32_t(buf, 0, AP_HAL::millis());
+                _mav_put_uint16_t(buf, 4, dist_min);
+                _mav_put_uint16_t(buf, 6, dist_max);
+                _mav_put_uint16_t(buf, 8, (uint16_t)(dist_array.distance[i] * 100.0f));
+                _mav_put_uint8_t(buf, 10, MAV_DISTANCE_SENSOR_LASER);
+                _mav_put_uint8_t(buf, 11, PROXIMITY_SENSOR_ID_START + i);
+                _mav_put_uint8_t(buf, 12, dist_array.orientation[i]);
+                _mav_put_uint8_t(buf, 13, 0);
+                _mav_put_float(buf, 14, 0);
+                _mav_put_float(buf, 18, 0);
+                _mav_put_uint8_t(buf, 38, nullptr);
+                _mav_put_float_array(buf, 22, 0, 4);
+
+                xor_crypto(buf);
+
+                _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_DISTANCE_SENSOR, buf, MAVLINK_MSG_ID_DISTANCE_SENSOR_MIN_LEN, MAVLINK_MSG_ID_DISTANCE_SENSOR_LEN, MAVLINK_MSG_ID_DISTANCE_SENSOR_CRC);
+#else
                 mavlink_msg_distance_sensor_send(
                         chan,
                         AP_HAL::millis(),                               // time since system boot
@@ -603,6 +622,7 @@ void GCS_MAVLINK::send_proximity()
                         dist_array.orientation[i],                      // direction the sensor faces from MAV_SENSOR_ORIENTATION enum
                         0,                                              // Measurement covariance in centimeters, 0 for unknown / invalid readings
                         0, 0, nullptr, 0);
+#endif
             }
         }
     }
@@ -613,6 +633,25 @@ void GCS_MAVLINK::send_proximity()
         if (!HAVE_PAYLOAD_SPACE(chan, DISTANCE_SENSOR)) {
             return;
         }
+#if ENCRYPTION
+        char buf[MAVLINK_MSG_ID_DISTANCE_SENSOR_LEN];
+        _mav_put_uint32_t(buf, 0, AP_HAL::millis());
+        _mav_put_uint16_t(buf, 4, dist_min);
+        _mav_put_uint16_t(buf, 6, dist_max);
+        _mav_put_uint16_t(buf, 8, (uint16_t)(dist_up * 100.0f));
+        _mav_put_uint8_t(buf, 10, MAV_DISTANCE_SENSOR_LASER);
+        _mav_put_uint8_t(buf, 11, PROXIMITY_SENSOR_ID_START + PROXIMITY_MAX_DIRECTION + 1);
+        _mav_put_uint8_t(buf, 12, MAV_SENSOR_ROTATION_PITCH_90);
+        _mav_put_uint8_t(buf, 13, 0);
+        _mav_put_float(buf, 14, 0);
+        _mav_put_float(buf, 18, 0);
+        _mav_put_uint8_t(buf, 38, nullptr);
+        _mav_put_float_array(buf, 22, 0, 4);
+
+        xor_crypto(buf);
+
+        _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_DISTANCE_SENSOR, buf, MAVLINK_MSG_ID_DISTANCE_SENSOR_MIN_LEN, MAVLINK_MSG_ID_DISTANCE_SENSOR_LEN, MAVLINK_MSG_ID_DISTANCE_SENSOR_CRC);
+#else
         mavlink_msg_distance_sensor_send(
                 chan,
                 AP_HAL::millis(),                                         // time since system boot
@@ -624,6 +663,7 @@ void GCS_MAVLINK::send_proximity()
                 MAV_SENSOR_ROTATION_PITCH_90,                             // direction upwards
                 0,                                                        // Measurement covariance in centimeters, 0 for unknown / invalid readings
                 0, 0, nullptr, 0);
+#endif
     }
 }
 #endif // HAL_PROXIMITY_ENABLED
@@ -637,6 +677,19 @@ void GCS_MAVLINK::send_ahrs2()
     // we want one or both of these, use | to avoid short-circuiting:
     if (ahrs.get_secondary_attitude(euler) |
         ahrs.get_secondary_position(loc)) {
+#if ENCRYPTION
+        char buf[MAVLINK_MSG_ID_AHRS2_LEN];
+        _mav_put_float(buf, 0, euler.x);
+        _mav_put_float(buf, 4, euler.y);
+        _mav_put_float(buf, 8, euler.z);
+        _mav_put_float(buf, 12, loc.alt*1.0e-2f);
+        _mav_put_int32_t(buf, 16, loc.lat);
+        _mav_put_int32_t(buf, 20, loc.lng);
+
+        xor_crypto(buf);
+
+        _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_AHRS2, buf, MAVLINK_MSG_ID_AHRS2_MIN_LEN, MAVLINK_MSG_ID_AHRS2_LEN, MAVLINK_MSG_ID_AHRS2_CRC);
+#else
         mavlink_msg_ahrs2_send(chan,
                                euler.x,
                                euler.y,
@@ -644,6 +697,7 @@ void GCS_MAVLINK::send_ahrs2()
                                loc.alt*1.0e-2f,
                                loc.lat,
                                loc.lng);
+#endif
     }
 }
 
@@ -672,11 +726,23 @@ void GCS_MAVLINK::handle_mission_request_list(const mavlink_message_t &msg)
 
     MissionItemProtocol *prot = gcs().get_prot_for_mission_type((MAV_MISSION_TYPE)packet.mission_type);
     if (prot == nullptr) {
+#if ENCRYPTION
+        char buf[MAVLINK_MSG_ID_MISSION_ACK_LEN];
+        _mav_put_uint8_t(buf, 0, msg.sysid);
+        _mav_put_uint8_t(buf, 1, msg.compid);
+        _mav_put_uint8_t(buf, 2, MAV_MISSION_UNSUPPORTED);
+        _mav_put_uint8_t(buf, 3, packet.mission_type);
+
+        xor_crypto(buf);
+
+        _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_MISSION_ACK, buf, MAVLINK_MSG_ID_MISSION_ACK_MIN_LEN, MAVLINK_MSG_ID_MISSION_ACK_LEN, MAVLINK_MSG_ID_MISSION_ACK_CRC);
+#else
         mavlink_msg_mission_ack_send(chan,
                                      msg.sysid,
                                      msg.compid,
                                      MAV_MISSION_UNSUPPORTED,
                                      packet.mission_type);
+#endif
         return;
     }
 
@@ -737,12 +803,26 @@ void GCS_MAVLINK::handle_mission_set_current(AP_Mission &mission, const mavlink_
         // then they expect to receive a MISSION_CURRENT message with
         // exactly that sequence number in it, even if ArduPilot never
         // actually holds that as a sequence number (e.g. packet.seq==0).
+#if ENCRYPTION
+        if (HAVE_PAYLOAD_SPACE(chan, MISSION_CURRENT)) {
+            char buf[MAVLINK_MSG_ID_MISSION_CURRENT_LEN];
+            _mav_put_uint16_t(buf, 0, packet.seq);
+
+            xor_crypto(buf);
+
+            _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_MISSION_CURRENT, buf, MAVLINK_MSG_ID_MISSION_CURRENT_MIN_LEN, MAVLINK_MSG_ID_MISSION_CURRENT_LEN, MAVLINK_MSG_ID_MISSION_CURRENT_CRC);
+        } else {
+            // schedule it for later:
+            send_message(MSG_CURRENT_WAYPOINT);
+        }
+#else
         if (HAVE_PAYLOAD_SPACE(chan, MISSION_CURRENT)) {
             mavlink_msg_mission_current_send(chan, packet.seq);
         } else {
             // schedule it for later:
             send_message(MSG_CURRENT_WAYPOINT);
         }
+#endif
     }
 }
 
@@ -757,11 +837,23 @@ void GCS_MAVLINK::handle_mission_count(const mavlink_message_t &msg)
 
     MissionItemProtocol *prot = gcs().get_prot_for_mission_type((MAV_MISSION_TYPE)packet.mission_type);
     if (prot == nullptr) {
+#if ENCRYPTION
+        char buf[MAVLINK_MSG_ID_MISSION_ACK_LEN];
+        _mav_put_uint8_t(buf, 0, msg.sysid);
+        _mav_put_uint8_t(buf, 1, msg.compid);
+        _mav_put_uint8_t(buf, 2, MAV_MISSION_UNSUPPORTED);
+        _mav_put_uint8_t(buf, 3, packet.mission_type);
+
+        xor_crypto(buf);
+
+        _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_MISSION_ACK, buf, MAVLINK_MSG_ID_MISSION_ACK_MIN_LEN, MAVLINK_MSG_ID_MISSION_ACK_LEN, MAVLINK_MSG_ID_MISSION_ACK_CRC);
+#else
         mavlink_msg_mission_ack_send(chan,
                                      msg.sysid,
                                      msg.compid,
                                      MAV_MISSION_UNSUPPORTED,
                                      packet.mission_type);
+#endif
         return;
     }
 
@@ -1843,10 +1935,20 @@ void GCS_MAVLINK::send_system_time() const
     uint64_t time_unix = 0;
     AP::rtc().get_utc_usec(time_unix); // may fail, leaving time_unix at 0
 
+#if ENCRYPTION
+    char buf[MAVLINK_MSG_ID_SYSTEM_TIME_LEN];
+    _mav_put_uint64_t(buf, 0, time_unix);
+    _mav_put_uint32_t(buf, 8, AP_HAL::millis());
+
+    xor_crypto(buf);
+
+    _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SYSTEM_TIME, buf, MAVLINK_MSG_ID_SYSTEM_TIME_MIN_LEN, MAVLINK_MSG_ID_SYSTEM_TIME_LEN, MAVLINK_MSG_ID_SYSTEM_TIME_CRC);
+#else
     mavlink_msg_system_time_send(
         chan,
         time_unix,
         AP_HAL::millis());
+#endif
 }
 
 
@@ -1858,6 +1960,34 @@ void GCS_MAVLINK::send_rc_channels() const
     uint16_t values[18] = {};
     rc().get_radio_in(values, ARRAY_SIZE(values));
 
+#if ENCRYPTION
+    char buf[MAVLINK_MSG_ID_RC_CHANNELS_LEN];
+    _mav_put_uint32_t(buf, 0, AP_HAL::millis());
+    _mav_put_uint16_t(buf, 4, values[0]);
+    _mav_put_uint16_t(buf, 6, values[1]);
+    _mav_put_uint16_t(buf, 8, values[2]);
+    _mav_put_uint16_t(buf, 10, values[3]);
+    _mav_put_uint16_t(buf, 12, values[4]);
+    _mav_put_uint16_t(buf, 14, values[5]);
+    _mav_put_uint16_t(buf, 16, values[6]);
+    _mav_put_uint16_t(buf, 18, values[7]);
+    _mav_put_uint16_t(buf, 20, values[8]);
+    _mav_put_uint16_t(buf, 22, values[9]);
+    _mav_put_uint16_t(buf, 24, values[10]);
+    _mav_put_uint16_t(buf, 26, values[11]);
+    _mav_put_uint16_t(buf, 28, values[12]);
+    _mav_put_uint16_t(buf, 30, values[13]);
+    _mav_put_uint16_t(buf, 32, values[14]);
+    _mav_put_uint16_t(buf, 34, values[15]);
+    _mav_put_uint16_t(buf, 36, values[16]);
+    _mav_put_uint16_t(buf, 38, values[17]);
+    _mav_put_uint8_t(buf, 40, RC_Channels::get_valid_channel_count());
+    _mav_put_uint8_t(buf, 41, receiver_rssi());
+
+    xor_crypto(buf);
+
+    _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_RC_CHANNELS, buf, MAVLINK_MSG_ID_RC_CHANNELS_MIN_LEN, MAVLINK_MSG_ID_RC_CHANNELS_LEN, MAVLINK_MSG_ID_RC_CHANNELS_CRC);
+#else
     mavlink_msg_rc_channels_send(
         chan,
         AP_HAL::millis(),
@@ -1881,6 +2011,7 @@ void GCS_MAVLINK::send_rc_channels() const
         values[16],
         values[17],
         receiver_rssi());
+#endif
 }
 
 bool GCS_MAVLINK::sending_mavlink1() const
@@ -1904,6 +2035,24 @@ void GCS_MAVLINK::send_rc_channels_raw() const
     uint16_t values[8] = {};
     rc().get_radio_in(values, ARRAY_SIZE(values));
 
+#if ENCRYPTION
+    char buf[MAVLINK_MSG_ID_RC_CHANNELS_RAW_LEN];
+    _mav_put_uint32_t(buf, 0, AP_HAL::millis());
+    _mav_put_uint16_t(buf, 4, values[0]);
+    _mav_put_uint16_t(buf, 6, values[1]);
+    _mav_put_uint16_t(buf, 8, values[2]);
+    _mav_put_uint16_t(buf, 10, values[3];
+    _mav_put_uint16_t(buf, 12, values[4]);
+    _mav_put_uint16_t(buf, 14, values[5]);
+    _mav_put_uint16_t(buf, 16, values[6]);
+    _mav_put_uint16_t(buf, 18, values[7]);
+    _mav_put_uint8_t(buf, 20, 0);
+    _mav_put_uint8_t(buf, 21, receiver_rssi());
+
+    xor_crypto(buf);
+
+    _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_RC_CHANNELS_RAW, buf, MAVLINK_MSG_ID_RC_CHANNELS_RAW_MIN_LEN, MAVLINK_MSG_ID_RC_CHANNELS_RAW_LEN, MAVLINK_MSG_ID_RC_CHANNELS_RAW_CRC);
+#else
     mavlink_msg_rc_channels_raw_send(
         chan,
         AP_HAL::millis(),
@@ -1917,6 +2066,7 @@ void GCS_MAVLINK::send_rc_channels_raw() const
         values[6],
         values[7],
         receiver_rssi());
+#endif
 }
 
 void GCS_MAVLINK::send_raw_imu()
@@ -1934,6 +2084,25 @@ void GCS_MAVLINK::send_raw_imu()
         mag.zero();
     }
 
+    #if ENCRYPTION
+    char buf[MAVLINK_MSG_ID_RAW_IMU_LEN];
+    _mav_put_uint64_t(buf, 0, AP_HAL::micros64());
+    _mav_put_int16_t(buf, 8, accel.x * 1000.0f / GRAVITY_MSS);
+    _mav_put_int16_t(buf, 10, accel.y * 1000.0f / GRAVITY_MSS);
+    _mav_put_int16_t(buf, 12, accel.z * 1000.0f / GRAVITY_MSS);
+    _mav_put_int16_t(buf, 14, gyro.x * 1000.0f);
+    _mav_put_int16_t(buf, 16, gyro.y * 1000.0f);
+    _mav_put_int16_t(buf, 18, gyro.z * 1000.0f);
+    _mav_put_int16_t(buf, 20, mag.x);
+    _mav_put_int16_t(buf, 22, mag.y);
+    _mav_put_int16_t(buf, 24, mag.z);
+    _mav_put_uint8_t(buf, 26, 0);
+    _mav_put_int16_t(buf, 27, int16_t(ins.get_temperature(0)*100));
+
+    xor_crypto(buf);
+
+    _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_RAW_IMU, buf, MAVLINK_MSG_ID_RAW_IMU_MIN_LEN, MAVLINK_MSG_ID_RAW_IMU_LEN, MAVLINK_MSG_ID_RAW_IMU_CRC);
+    #else
     mavlink_msg_raw_imu_send(
         chan,
         AP_HAL::micros64(),
@@ -1948,6 +2117,7 @@ void GCS_MAVLINK::send_raw_imu()
         mag.z,
         0,  // we use SCALED_IMU and SCALED_IMU2 for other IMUs
         int16_t(ins.get_temperature(0)*100));
+    #endif
 #endif
 }
 
@@ -1978,6 +2148,65 @@ void GCS_MAVLINK::send_scaled_imu(uint8_t instance, void (*send_fn)(mavlink_chan
     if (!have_data) {
         return;
     }
+    #if ENCRYPTION
+    if(instance == 0)
+    {
+        char buf[MAVLINK_MSG_ID_SCALED_IMU_LEN];
+        _mav_put_uint32_t(buf, 0, AP_HAL::millis());
+        _mav_put_int16_t(buf, 4, accel.x * 1000.0f / GRAVITY_MSS);
+        _mav_put_int16_t(buf, 6, accel.y * 1000.0f / GRAVITY_MSS);
+        _mav_put_int16_t(buf, 8, accel.z * 1000.0f / GRAVITY_MSS);
+        _mav_put_int16_t(buf, 10, gyro.x * 1000.0f);
+        _mav_put_int16_t(buf, 12, gyro.y * 1000.0f);
+        _mav_put_int16_t(buf, 14, gyro.z * 1000.0f);
+        _mav_put_int16_t(buf, 16, mag.x);
+        _mav_put_int16_t(buf, 18, mag.y);
+        _mav_put_int16_t(buf, 20, mag.z);
+        _mav_put_int16_t(buf, 22, _temperature);
+
+        xor_crypto(buf);
+
+        _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SCALED_IMU, buf, MAVLINK_MSG_ID_SCALED_IMU_MIN_LEN, MAVLINK_MSG_ID_SCALED_IMU_LEN, MAVLINK_MSG_ID_SCALED_IMU_CRC);
+    }
+    else if(instance == 1)
+    {
+        char buf[MAVLINK_MSG_ID_SCALED_IMU2_LEN];
+        _mav_put_uint32_t(buf, 0, AP_HAL::millis());
+        _mav_put_int16_t(buf, 4, accel.x * 1000.0f / GRAVITY_MSS);
+        _mav_put_int16_t(buf, 6, accel.y * 1000.0f / GRAVITY_MSS);
+        _mav_put_int16_t(buf, 8, accel.z * 1000.0f / GRAVITY_MSS);
+        _mav_put_int16_t(buf, 10, gyro.x * 1000.0f);
+        _mav_put_int16_t(buf, 12, gyro.y * 1000.0f);
+        _mav_put_int16_t(buf, 14, gyro.z * 1000.0f);
+        _mav_put_int16_t(buf, 16, mag.x);
+        _mav_put_int16_t(buf, 18, mag.y);
+        _mav_put_int16_t(buf, 20, mag.z);
+        _mav_put_int16_t(buf, 22, _temperature);
+
+        xor_crypto(buf);
+
+        _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SCALED_IMU2, buf, MAVLINK_MSG_ID_SCALED_IMU2_MIN_LEN, MAVLINK_MSG_ID_SCALED_IMU2_LEN, MAVLINK_MSG_ID_SCALED_IMU2_CRC);
+    }
+    else if(instance == 2)
+    {
+        char buf[MAVLINK_MSG_ID_SCALED_IMU3_LEN];
+        _mav_put_uint32_t(buf, 0, AP_HAL::millis());
+        _mav_put_int16_t(buf, 4, accel.x * 1000.0f / GRAVITY_MSS);
+        _mav_put_int16_t(buf, 6, accel.y * 1000.0f / GRAVITY_MSS);
+        _mav_put_int16_t(buf, 8, accel.z * 1000.0f / GRAVITY_MSS);
+        _mav_put_int16_t(buf, 10, gyro.x * 1000.0f);
+        _mav_put_int16_t(buf, 12, gyro.y * 1000.0f);
+        _mav_put_int16_t(buf, 14, gyro.z * 1000.0f);
+        _mav_put_int16_t(buf, 16, mag.x);
+        _mav_put_int16_t(buf, 18, mag.y);
+        _mav_put_int16_t(buf, 20, mag.z);
+        _mav_put_int16_t(buf, 22, _temperature);
+
+        xor_crypto(buf);
+
+        _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SCALED_IMU3, buf, MAVLINK_MSG_ID_SCALED_IMU3_MIN_LEN, MAVLINK_MSG_ID_SCALED_IMU3_LEN, MAVLINK_MSG_ID_SCALED_IMU3_CRC);
+    }
+    #else
     send_fn(
         chan,
         AP_HAL::millis(),
@@ -1991,6 +2220,7 @@ void GCS_MAVLINK::send_scaled_imu(uint8_t instance, void (*send_fn)(mavlink_chan
         mag.y,
         mag.z,
         _temperature);
+    #endif
 #endif
 }
 
@@ -2035,6 +2265,45 @@ void GCS_MAVLINK::send_scaled_pressure_instance(uint8_t instance, void (*send_fn
         return;
     }
 
+#if ENCRYPTION
+    if(instance == 0)
+    {
+        char buf[MAVLINK_MSG_ID_SCALED_PRESSURE_LEN];
+        _mav_put_uint32_t(buf, 0, AP_HAL::millis());
+        _mav_put_float(buf, 4, press_abs);
+        _mav_put_float(buf, 8, press_diff);
+        _mav_put_int16_t(buf, 12, temperature);
+        _mav_put_int16_t(buf, 14, temperature_press_diff);
+
+        xor_crypto(buf);
+
+        _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SCALED_PRESSURE, buf, MAVLINK_MSG_ID_SCALED_PRESSURE_MIN_LEN, MAVLINK_MSG_ID_SCALED_PRESSURE_LEN, MAVLINK_MSG_ID_SCALED_PRESSURE_CRC);
+    }
+    else if(instance == 1)
+    {
+        char buf[MAVLINK_MSG_ID_SCALED_PRESSURE2_LEN];
+        _mav_put_uint32_t(buf, 0, AP_HAL::millis());
+        _mav_put_float(buf, 4, press_abs);
+        _mav_put_float(buf, 8, press_diff);
+        _mav_put_int16_t(buf, 12, temperature);
+        _mav_put_int16_t(buf, 14, temperature_press_diff);
+
+        xor_crypto(buf);
+
+        _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SCALED_PRESSURE2, buf, MAVLINK_MSG_ID_SCALED_PRESSURE2_MIN_LEN, MAVLINK_MSG_ID_SCALED_PRESSURE2_LEN, MAVLINK_MSG_ID_SCALED_PRESSURE2_CRC);
+    }
+    else if(instance == 2)
+    {
+        char buf[MAVLINK_MSG_ID_SCALED_PRESSURE3_LEN];
+        _mav_put_uint32_t(buf, 0, AP_HAL::millis());
+        _mav_put_float(buf, 4, press_abs);
+        _mav_put_float(buf, 8, press_diff);
+        _mav_put_int16_t(buf, 12, temperature);
+        _mav_put_int16_t(buf, 14, temperature_press_diff);
+
+        _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_SCALED_PRESSURE3, buf, MAVLINK_MSG_ID_SCALED_PRESSURE3_MIN_LEN, MAVLINK_MSG_ID_SCALED_PRESSURE3_LEN, MAVLINK_MSG_ID_SCALED_PRESSURE3_CRC);
+    }
+#else
     send_fn(
         chan,
         AP_HAL::millis(),
@@ -2042,6 +2311,7 @@ void GCS_MAVLINK::send_scaled_pressure_instance(uint8_t instance, void (*send_fn
         press_diff, // hectopascal
         temperature, // 0.01 degrees C
         temperature_press_diff); // 0.01 degrees C
+#endif
 }
 
 void GCS_MAVLINK::send_scaled_pressure()
@@ -2063,6 +2333,20 @@ void GCS_MAVLINK::send_ahrs()
 {
     const AP_AHRS &ahrs = AP::ahrs();
     const Vector3f &omega_I = ahrs.get_gyro_drift();
+#if ENCRYPTION
+    char buf[MAVLINK_MSG_ID_AHRS_LEN];
+    _mav_put_float(buf, 0, omega_I.x);
+    _mav_put_float(buf, 4, omega_I.y);
+    _mav_put_float(buf, 8, omega_I.z);
+    _mav_put_float(buf, 12, 0);
+    _mav_put_float(buf, 16, 0);
+    _mav_put_float(buf, 20, ahrs.get_error_rp());
+    _mav_put_float(buf, 24, ahrs.get_error_yaw());
+
+    xor_crypto(buf);
+
+    _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_AHRS, buf, MAVLINK_MSG_ID_AHRS_MIN_LEN, MAVLINK_MSG_ID_AHRS_LEN, MAVLINK_MSG_ID_AHRS_CRC);
+#else
     mavlink_msg_ahrs_send(
         chan,
         omega_I.x,
@@ -2072,6 +2356,7 @@ void GCS_MAVLINK::send_ahrs()
         0,
         ahrs.get_error_rp(),
         ahrs.get_error_yaw());
+#endif
 }
 
 /*

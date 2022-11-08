@@ -177,11 +177,21 @@ public:
                           MAV_MISSION_TYPE mission_type,
                           MAV_MISSION_RESULT result) const {
         CHECK_PAYLOAD_SIZE2_VOID(chan, MISSION_ACK);
+#if ENCRYPTION
+        char buf[MAVLINK_MSG_ID_MISSION_ACK_LEN];
+        _mav_put_uint8_t(buf, 0, msg.sysid);
+        _mav_put_uint8_t(buf, 1, msg.compid);
+        _mav_put_uint8_t(buf, 2, result);
+        _mav_put_uint8_t(buf, 3, mission_type);
+
+        _mav_finalize_message_chan_send(chan, MAVLINK_MSG_ID_MISSION_ACK, buf, MAVLINK_MSG_ID_MISSION_ACK_MIN_LEN, MAVLINK_MSG_ID_MISSION_ACK_LEN, MAVLINK_MSG_ID_MISSION_ACK_CRC);
+#else
         mavlink_msg_mission_ack_send(chan,
                                      msg.sysid,
                                      msg.compid,
                                      result,
                                      mission_type);
+#endif
     }
 
     static const MAV_MISSION_TYPE supported_mission_types[3];
