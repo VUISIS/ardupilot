@@ -325,6 +325,9 @@ def do_build(opts, frame_options):
     if opts.debug:
         cmd_configure.append("--debug")
 
+    if opts.encryption:
+        cmd_configure.append("--encryption")
+
     if opts.coverage:
         cmd_configure.append("--coverage")
 
@@ -944,6 +947,11 @@ parser.add_option("-f", "--frame", type='string', default=None, help="""set vehi
 parser.add_option("--vehicle-binary",
                   default=None,
                   help="vehicle binary path")
+
+parser.add_option("-e", "--encryption",
+                  action='store_true',
+                  default=False,
+                  help="XOR encryption in mavlink.")
 
 parser.add_option("-C", "--sim_vehicle_sh_compatible",
                   action='store_true',

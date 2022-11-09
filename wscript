@@ -2,9 +2,11 @@
 # encoding: utf-8
 
 from __future__ import print_function
+from operator import truediv
 
 import os.path
 import os
+from shutil import copyfile
 import sys
 import subprocess
 import json
@@ -16,6 +18,7 @@ import boards
 
 from waflib import Build, ConfigSet, Configure, Context, Utils
 from waflib.Configure import conf
+from waflib.extras import buildcopy
 
 # Ref: https://stackoverflow.com/questions/40590192/getting-an-error-attributeerror-module-object-has-no-attribute-run-while
 try:
@@ -364,6 +367,11 @@ configuration in order to save typing.
 	    default=None,
 	    help='Extra hwdef.dat file for custom build.')
 
+    g.add_option('--encryption',
+	    action='store_true',
+	    default=None,
+	    help='Add XOR encryption to mavlink.')
+
     g.add_option('--assert-cc-version',
                  default=None,
                  help='fail configure if not using the specified gcc version')
@@ -384,7 +392,7 @@ def _collect_autoconfig_files(cfg):
 
             with open(p, 'rb') as f:
                 cfg.hash = Utils.h_list((cfg.hash, f.read()))
-                cfg.files.append(p)
+                cfg.files.append(p)    
 
 def configure(cfg):
 	# we need to enable debug mode when building for gconv, and force it to sitl
@@ -419,12 +427,16 @@ def configure(cfg):
     cfg.env.ENABLE_MALLOC_GUARD = cfg.options.enable_malloc_guard
     cfg.env.ENABLE_STATS = cfg.options.enable_stats
     cfg.env.SAVE_TEMPS = cfg.options.save_temps
+    cfg.env.ENCRYPTION = cfg.options.encryption
 
     cfg.env.HWDEF_EXTRA = cfg.options.extra_hwdef
     if cfg.env.HWDEF_EXTRA:
         cfg.env.HWDEF_EXTRA = os.path.abspath(cfg.env.HWDEF_EXTRA)
 
     cfg.env.OPTIONS = cfg.options.__dict__
+
+    if cfg.options.encryption:
+        cfg.define('ENCRYPTION', 1)
 
     # Allow to differentiate our build from the make build
     cfg.define('WAF_BUILD', 1)
@@ -660,7 +672,6 @@ def _build_dynamic_sources(bld):
             ]
         )
 
-
     def write_version_header(tsk):
         bld = tsk.generator.bld
         return bld.write_version_header(tsk.outputs[0].abspath())
@@ -773,7 +784,14 @@ def _load_pre_build(bld):
     if getattr(brd, 'pre_build', None):
         brd.pre_build(bld)    
 
+def copy_mavlink(bld):
+    if bld.env.ENCRYPTION:
+        inp_file = bld.path.make_node('libraries/GCS_MAVLink/includes/mavlink_helpers.h')
+        out_file = bld.path.make_node('build/CubeOrange/libraries/GCS_MAVLink/include/mavlink/v2.0/mavlink_helpers.h')
+        copyfile(inp_file.abspath(), out_file.abspath())
+
 def build(bld):
+    bld.add_post_fun(copy_mavlink)
     config_hash = Utils.h_file(bld.bldnode.make_node('ap_config.h').abspath())
     bld.env.CCDEPS = config_hash
     bld.env.CXXDEPS = config_hash
