@@ -419,6 +419,7 @@ def configure(cfg):
         cfg.options.enable_check_firmware = True
 
     cfg.env.BOARD = cfg.options.board
+    cfg.msg("BOARD", cfg.env.BOARD)
     cfg.env.DEBUG = cfg.options.debug
     cfg.env.COVERAGE = cfg.options.coverage
     cfg.env.SITL32BIT = cfg.options.sitl_32bit
@@ -435,7 +436,7 @@ def configure(cfg):
 
     cfg.env.OPTIONS = cfg.options.__dict__
 
-    if cfg.options.encryption:
+    if cfg.env.ENCRYPTION:
         cfg.define('ENCRYPTION', 1)
 
     # Allow to differentiate our build from the make build
@@ -787,7 +788,7 @@ def _load_pre_build(bld):
 def copy_mavlink(bld):
     if bld.env.ENCRYPTION:
         inp_file = bld.path.make_node('libraries/GCS_MAVLink/includes/mavlink_helpers.h')
-        out_file = bld.path.make_node('build/CubeOrange/libraries/GCS_MAVLink/include/mavlink/v2.0/mavlink_helpers.h')
+        out_file = bld.path.make_node('build/'+str(bld.env.BOARD)+'/libraries/GCS_MAVLink/include/mavlink/v2.0/mavlink_helpers.h')
         copyfile(inp_file.abspath(), out_file.abspath())
 
 def build(bld):

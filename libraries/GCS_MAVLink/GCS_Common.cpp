@@ -89,6 +89,22 @@
 #endif
 #include <AP_GPS/AP_GPS.h>
 
+#if ENCRYPTION
+#include <string>
+
+static void xor_crypto(char* message)
+{
+    char key = 'X';
+
+    int len = strlen(message);
+  
+    for (int i = 0; i < len; i++)
+    {
+        message[i] = message[i] ^ key;
+    }
+}
+#endif
+
 #include <ctype.h>
 
 extern const AP_HAL::HAL& hal;
@@ -1503,12 +1519,46 @@ void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
 #if ENCRYPTION
     char* raw = new char[sizeof(mavlink_message_t)];
     mavlink_message_t decMsg;
-    memcpy(raw, msg, sizeof(mavlink_message_t));
+    std::memcpy(raw, &msg, sizeof(mavlink_message_t));
 
     xor_crypto(raw);
 
-    memcpy(msg, raw, sizeof(mavlink_message_t));  
+    std::memcpy(&decMsg, raw, sizeof(mavlink_message_t));  
+
+    // we exclude radio packets because we historically used this to
+    // make it possible to use the CLI over the radio
+    if (decMsg.msgid != MAVLINK_MSG_ID_RADIO && decMsg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
+        mavlink_active |= (1U<<(chan-MAVLINK_COMM_0));
+    }
+    const auto mavlink_protocol = uartstate->get_protocol();
+    if (!(status.flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1) &&
+        (status.flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1) &&
+        (mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLink2 ||
+         mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLinkHL)) {
+        // if we receive any MAVLink2 packets on a connection
+        // currently sending MAVLink1 then switch to sending
+        // MAVLink2
+        mavlink_status_t *cstatus = mavlink_get_channel_status(chan);
+        if (cstatus != nullptr) {
+            cstatus->flags &= ~MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
+        }
+    }
+    if (!routing.check_and_forward(chan, decMsg)) {
+        // the routing code has indicated we should not handle this packet locally
+        return;
+    }
+    if (decMsg.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
+#if HAL_MOUNT_ENABLED
+        // allow mounts to see the location of other vehicles
+        handle_mount_message(decMsg);
 #endif
+    }
+    if (!accept_packet(status, decMsg)) {
+        // e.g. enforce-sysid says we shouldn't look at this packet
+        return;
+    }
+    handleMessage(decMsg);
+#else
     // we exclude radio packets because we historically used this to
     // make it possible to use the CLI over the radio
     if (msg.msgid != MAVLINK_MSG_ID_RADIO && msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
@@ -1542,6 +1592,7 @@ void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
         return;
     }
     handleMessage(msg);
+#endif
 }
 
 void
