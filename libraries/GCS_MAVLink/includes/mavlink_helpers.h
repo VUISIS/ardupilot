@@ -330,7 +330,7 @@ MAVLINK_HELPER void _mav_finalize_message_chan_send(mavlink_channel_t chan, uint
 {
 #if ENCRYPTION
     char* raw = new char[length];
-	std::memcpy(raw, &packet, length);
+	memcpy(raw, &packet, length);
 	xor_crypto(raw, length);
 
 	uint16_t checksum;
