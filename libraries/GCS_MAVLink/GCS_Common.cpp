@@ -92,11 +92,9 @@
 #if ENCRYPTION
 #include <string>
 
-static void xor_crypto(char* message)
+static void xor_crypto(char* message, int len)
 {
     char key = 'X';
-
-    int len = strlen(message);
   
     for (int i = 0; i < len; i++)
     {
@@ -1521,7 +1519,7 @@ void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
     mavlink_message_t decMsg;
     std::memcpy(raw, &msg, sizeof(mavlink_message_t));
 
-    xor_crypto(raw);
+    xor_crypto(raw, msg.len);
 
     std::memcpy(&decMsg, raw, sizeof(mavlink_message_t));  
 
