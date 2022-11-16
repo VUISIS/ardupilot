@@ -789,6 +789,8 @@ def copy_mavlink(bld):
     if bld.env.ENCRYPTION:
         inp_file = bld.path.make_node('libraries/GCS_MAVLink/includes/mavlink_helpers.h')
         out_file = bld.path.make_node('build/'+str(bld.env.BOARD)+'/libraries/GCS_MAVLink/include/mavlink/v2.0/mavlink_helpers.h')
+        if os.path.exists(out_file.abspath()):
+            os.remove(out_file.abspath())
         copyfile(inp_file.abspath(), out_file.abspath())
 
 def build(bld):

@@ -50,7 +50,7 @@ MAVLINK_HELPER mavlink_message_t* mavlink_get_channel_buffer(uint8_t chan)
 #endif // MAVLINK_GET_CHANNEL_BUFFER
 
 #if ENCRYPTION
-#include <string>
+#include <string.h>
 
 static void xor_crypto(char* message, int len)
 {
@@ -329,8 +329,7 @@ MAVLINK_HELPER void _mav_finalize_message_chan_send(mavlink_channel_t chan, uint
 						    uint8_t min_length, uint8_t length, uint8_t crc_extra)
 {
 #if ENCRYPTION
-    char* raw = new char[length];
-	memcpy(raw, &packet, length);
+    char* raw = (char*)packet;
 	xor_crypto(raw, length);
 
 	uint16_t checksum;
