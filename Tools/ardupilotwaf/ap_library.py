@@ -112,6 +112,12 @@ def ap_library(bld, library, vehicle):
 
     src = library_dir.ant_glob(wildcard)
 
+    if library == "GCS_MAVLink":
+        src += bld.path.ant_glob(bld.env.CRYPTOPP_DIR + '/**/*.cpp')
+        src += bld.path.ant_glob(bld.env.CRYPTOPP_DIR + '/**/*.h')
+        bld.env.LIB += ['libcryptopp.a']
+        bld.env.LIBPATH += [bld.env.CRYPTOPP_DIR]
+
     # allow for dynamically generated sources in a library that inherit the
     # dependencies and includes
     if library in bld.env.AP_LIB_EXTRA_SOURCES:

@@ -60,6 +60,8 @@
 #include "MissionItemProtocol_Rally.h"
 #include "MissionItemProtocol_Fence.h"
 
+#include "cryptlib.h"
+
 #include <stdio.h>
 
 #if HAL_RCINPUT_WITH_AP_RADIO
