@@ -325,6 +325,9 @@ def do_build(opts, frame_options):
     if opts.debug:
         cmd_configure.append("--debug")
 
+    if opts.cryptopp:
+        cmd_configure.append("--cryptopp")
+
     if opts.coverage:
         cmd_configure.append("--coverage")
 
@@ -950,6 +953,11 @@ parser.add_option("-C", "--sim_vehicle_sh_compatible",
                   default=False,
                   help="be compatible with the way sim_vehicle.sh works; "
                   "make this the first option")
+
+parser.add_option("--cryptopp",
+                  action='store_true',
+                  default=False,
+                  help="Encryption in mavlink.")
 
 group_build = optparse.OptionGroup(parser, "Build options")
 group_build.add_option("-N", "--no-rebuild",

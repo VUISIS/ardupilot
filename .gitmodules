@@ -34,3 +34,6 @@
 [submodule "modules/DroneCAN/libcanard"]
 	path = modules/DroneCAN/libcanard
 	url = https://github.com/DroneCAN/libcanard
+[submodule "modules/cryptopp"]
+	path = modules/cryptopp
+	url = git@github.com:weidai11/cryptopp.git

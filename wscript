@@ -246,6 +246,10 @@ submodules at specific revisions.
     g.add_option('--enable-custom-controller', action='store_true',
                  default=False,
                  help="Enables custom controller")
+    
+    g.add_option('--cryptopp', action='store_true',
+                 default=False,
+                 help="Enables cryptopp encryption.")
 
     g = opt.ap_groups['linux']
 
@@ -419,6 +423,7 @@ def configure(cfg):
     cfg.env.ENABLE_MALLOC_GUARD = cfg.options.enable_malloc_guard
     cfg.env.ENABLE_STATS = cfg.options.enable_stats
     cfg.env.SAVE_TEMPS = cfg.options.save_temps
+    cfg.env.HAS_CRYPTOPP = cfg.options.cryptopp
 
     cfg.env.HWDEF_EXTRA = cfg.options.extra_hwdef
     if cfg.env.HWDEF_EXTRA:
@@ -445,6 +450,9 @@ def configure(cfg):
     cfg.load('mavgen')
     cfg.load('uavcangen')
 
+    if cfg.options.cryptopp:
+        cfg.load('cryptopp')
+
     cfg.env.SUBMODULE_UPDATE = cfg.options.submodule_update
 
     cfg.start_msg('Source is git repository')
@@ -459,12 +467,19 @@ def configure(cfg):
 
     if cfg.options.enable_benchmarks:
         cfg.load('gbenchmark')
+
     cfg.load('gtest')
     cfg.load('static_linking')
     cfg.load('build_summary')
 
     cfg.start_msg('Benchmarks')
     if cfg.env.HAS_GBENCHMARK:
+        cfg.end_msg('enabled')
+    else:
+        cfg.end_msg('disabled', color='YELLOW')
+
+    cfg.start_msg('CryptoPP')
+    if cfg.env.HAS_CRYPTOPP:
         cfg.end_msg('enabled')
     else:
         cfg.end_msg('disabled', color='YELLOW')
@@ -771,7 +786,7 @@ def _load_pre_build(bld):
         if not os.path.exists(dsdlc_gen_path) or not os.listdir(dsdlc_gen_path):
             generate_dronecan_dsdlc(bld)
     if getattr(brd, 'pre_build', None):
-        brd.pre_build(bld)    
+        brd.pre_build(bld)  
 
 def build(bld):
     config_hash = Utils.h_file(bld.bldnode.make_node('ap_config.h').abspath())
@@ -779,6 +794,9 @@ def build(bld):
     bld.env.CXXDEPS = config_hash
 
     bld.post_mode = Build.POST_LAZY
+
+    if bld.env.HAS_CRYPTOPP:
+        bld.libcryptopp()
 
     bld.load('ardupilotwaf')
 
