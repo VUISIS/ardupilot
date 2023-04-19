@@ -60,7 +60,9 @@
 #include "MissionItemProtocol_Rally.h"
 #include "MissionItemProtocol_Fence.h"
 
-#include "cryptlib.h"
+#if CRYPTOPP
+    #include <aes.h>
+#endif
 
 #include <stdio.h>
 

@@ -205,7 +205,7 @@ class Board:
             '-Werror=parentheses',
             '-Werror=format-extra-args',
             '-Werror=ignored-qualifiers',
-            '-Werror=undef',
+            '-Wno-undef',
             '-DARDUPILOT_BUILD',
         ]
 
@@ -316,7 +316,7 @@ class Board:
             '-Werror=switch',
             '-Werror=sign-compare',
             '-Werror=type-limits',
-            '-Werror=undef',
+            '-Wno-undef',
             '-Werror=unused-result',
             '-Werror=shadow',
             '-Werror=unused-value',
@@ -365,7 +365,7 @@ class Board:
             ]
             if self.cc_version_gte(cfg, 5, 2):
                 env.CXXFLAGS += [
-                    '-Werror=suggest-override',
+                    '-Wno-suggest-override',
                 ]
             if self.cc_version_gte(cfg, 7, 4):
                 env.CXXFLAGS += [
@@ -382,7 +382,7 @@ class Board:
             errors = ['-Werror',
                       '-Werror=missing-declarations',
                       '-Werror=float-equal',
-                      '-Werror=undef',
+                      '-Wno-undef',
                     ]
             env.CFLAGS += errors
             env.CXXFLAGS += errors

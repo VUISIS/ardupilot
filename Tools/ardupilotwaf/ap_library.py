@@ -112,12 +112,6 @@ def ap_library(bld, library, vehicle):
 
     src = library_dir.ant_glob(wildcard)
 
-    if library == "GCS_MAVLink":
-        src += bld.path.ant_glob(bld.env.CRYPTOPP_DIR + '/**/*.cpp')
-        src += bld.path.ant_glob(bld.env.CRYPTOPP_DIR + '/**/*.h')
-        bld.env.LIB += ['libcryptopp.a']
-        bld.env.LIBPATH += [bld.env.CRYPTOPP_DIR]
-
     # allow for dynamically generated sources in a library that inherit the
     # dependencies and includes
     if library in bld.env.AP_LIB_EXTRA_SOURCES:
@@ -125,17 +119,30 @@ def ap_library(bld, library, vehicle):
             src.append(bld.bldnode.find_or_declare(os.path.join('libraries', library, s)))
 
     if not common_tg:
+        source = [s for s in src if not _depends_on_vehicle(bld, s)]
+        if library == 'GCS_MAVLink' and bld.env.HAS_CRYPTOPP:
+            crypt_dir = bld.srcnode.find_dir('modules/cryptopp')
+            bld.define('CRYPTOPP', 1)
+            bld.env.AP_LIBRARIES_OBJECTS_KW['cxxflags'] = ["-fexceptions", "-I" + crypt_dir.abspath()]
+            bld.env.AP_LIBRARIES_OBJECTS_KW['ldlibs'] = ['-llibcryptopp.a']
+            bld.env.AP_LIBRARIES_OBJECTS_KW['ldflags'] = ['-L' + crypt_dir.abspath()]
         kw = dict(bld.env.AP_LIBRARIES_OBJECTS_KW)
         kw['features'] = kw.get('features', []) + ['ap_library_object']
         kw.update(
             name=_common_tgen_name(library),
-            source=[s for s in src if not _depends_on_vehicle(bld, s)],
+            source=source,
             idx=0,
         )
         bld.objects(**kw)
 
     if not vehicle_tg:
         source = [s for s in src if _depends_on_vehicle(bld, s)]
+        if library == 'GCS_MAVLink' and bld.env.HAS_CRYPTOPP:
+            crypt_dir = bld.srcnode.find_dir('modules/cryptopp')
+            bld.define('CRYPTOPP', 1)
+            bld.env.AP_LIBRARIES_OBJECTS_KW['cxxflags'] = ["-fexceptions", "-I" + crypt_dir.abspath()]
+            bld.env.AP_LIBRARIES_OBJECTS_KW['ldlibs'] = ['-llibcryptopp.a']
+            bld.env.AP_LIBRARIES_OBJECTS_KW['ldflags'] = ['-L' + crypt_dir.abspath()]
 
         if not source:
             return
