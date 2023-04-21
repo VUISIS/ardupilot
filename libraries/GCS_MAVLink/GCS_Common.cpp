@@ -62,6 +62,20 @@
 
 #if CRYPTOPP
     #include <aes.h>
+    #define MAVLINK_CORE_HEADER_LEN 9
+    #define MAVLINK_SIGNATURE_BLOCK_LEN 13
+    #define MAVLINK_CHECKSUM_LEN 2
+    #include <string.h>
+
+    static void xor_crypto(char* message, int start_pos, int len)
+    {
+        char key = 'X';
+    
+        for (int i = start_pos; i < len; i++)
+        {
+            message[i] = message[i] ^ key;
+        }
+    }
 #endif
 
 #include <stdio.h>
@@ -1504,6 +1518,16 @@ void GCS_MAVLINK::send_message(enum ap_message id)
 void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
                                  const mavlink_message_t &msg)
 {
+    #if CRYPTOPP
+        int len = msg.len;
+        char* msg_raw = new char[sizeof(uint64_t[len])];
+        memcpy(msg_raw, msg.payload64, sizeof(uint64_t[len]));
+        
+        xor_crypto(msg_raw, 0, len);
+
+        memcpy((void*)msg.payload64, msg_raw, sizeof(uint64_t[len]));
+    #endif
+
     // we exclude radio packets because we historically used this to
     // make it possible to use the CLI over the radio
     if (msg.msgid != MAVLINK_MSG_ID_RADIO && msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {

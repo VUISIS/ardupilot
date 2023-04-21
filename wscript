@@ -5,6 +5,7 @@ from __future__ import print_function
 
 import os.path
 import os
+from shutil import copyfile
 import sys
 import subprocess
 import json
@@ -787,8 +788,17 @@ def _load_pre_build(bld):
             generate_dronecan_dsdlc(bld)
     if getattr(brd, 'pre_build', None):
         brd.pre_build(bld)  
+    
+def copy_mavlink(bld):
+    if bld.env.HAS_CRYPTOPP:
+        inp_file = bld.path.find_or_declare('../../libraries/GCS_MAVLink/include/mavlink_helpers.h')
+        out_file = bld.path.find_or_declare('libraries/GCS_MAVLink/include/mavlink/v2.0/mavlink_helpers.h')
+        if os.path.exists(out_file.abspath()):
+            os.remove(out_file.abspath())
+        copyfile(inp_file.abspath(), out_file.abspath())
 
 def build(bld):
+    bld.add_post_fun(copy_mavlink)
     config_hash = Utils.h_file(bld.bldnode.make_node('ap_config.h').abspath())
     bld.env.CCDEPS = config_hash
     bld.env.CXXDEPS = config_hash
