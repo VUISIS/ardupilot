@@ -120,12 +120,14 @@ def ap_library(bld, library, vehicle):
 
     if not common_tg:
         source = [s for s in src if not _depends_on_vehicle(bld, s)]
-        if library == 'GCS_MAVLink' and bld.env.HAS_CRYPTOPP:
+        if bld.env.HAS_CRYPTOPP:
             crypt_dir = bld.srcnode.find_dir('modules/cryptopp')
             bld.define('CRYPTOPP', 1)
-            bld.env.AP_LIBRARIES_OBJECTS_KW['cxxflags'] = ["-fexceptions", "-I" + crypt_dir.abspath()]
-            bld.env.AP_LIBRARIES_OBJECTS_KW['ldlibs'] = ['-llibcryptopp.a']
-            bld.env.AP_LIBRARIES_OBJECTS_KW['ldflags'] = ['-L' + crypt_dir.abspath()]
+            bld.env.CXXFLAGS += ['-fexceptions']
+            source += bld.path.ant_glob(crypt_dir.abspath() + '/*.cpp')
+            bld.env.AP_LIBRARIES_OBJECTS_KW['includes'] = [crypt_dir.abspath()]
+            bld.env.AP_LIBRARIES_OBJECTS_KW['linkflags'] = ['-L' + crypt_dir.abspath(), '-lcryptopp']
+
         kw = dict(bld.env.AP_LIBRARIES_OBJECTS_KW)
         kw['features'] = kw.get('features', []) + ['ap_library_object']
         kw.update(
@@ -137,13 +139,14 @@ def ap_library(bld, library, vehicle):
 
     if not vehicle_tg:
         source = [s for s in src if _depends_on_vehicle(bld, s)]
-        if library == 'GCS_MAVLink' and bld.env.HAS_CRYPTOPP:
+        if bld.env.HAS_CRYPTOPP:
             crypt_dir = bld.srcnode.find_dir('modules/cryptopp')
             bld.define('CRYPTOPP', 1)
-            bld.env.AP_LIBRARIES_OBJECTS_KW['cxxflags'] = ["-fexceptions", "-I" + crypt_dir.abspath()]
-            bld.env.AP_LIBRARIES_OBJECTS_KW['ldlibs'] = ['-llibcryptopp.a']
-            bld.env.AP_LIBRARIES_OBJECTS_KW['ldflags'] = ['-L' + crypt_dir.abspath()]
-
+            bld.env.CXXFLAGS += ['-fexceptions']
+            source += bld.path.ant_glob(crypt_dir.abspath() + '/*.cpp')
+            bld.env.AP_LIBRARIES_OBJECTS_KW['includes'] = [crypt_dir.abspath()]
+            bld.env.AP_LIBRARIES_OBJECTS_KW['linkflags'] = ['-L' + crypt_dir.abspath(), '-lcryptopp']
+            
         if not source:
             return
 

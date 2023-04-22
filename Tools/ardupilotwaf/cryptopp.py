@@ -1,9 +1,11 @@
 from waflib.Configure import conf
 
 def configure(cfg):
-    cfg.env.CRYPTOPP_LIB = 'libcryptopp.a'
-    cfg.env.CRYPTOPP_DIR = cfg.path.find_or_declare('../modules/cryptopp').abspath()
+    crypt_dir = cfg.path.find_or_declare('../modules/cryptopp').abspath()
+    cfg.env.INCLUDES_CRYPTOPP = [crypt_dir]
+    cfg.env.LIBPATH_CRYPTOPP = [crypt_dir]
+    cfg.env.LIB_CRYPTOPP = ['cryptopp']
 
 @conf
 def libcryptopp(bld):
-    bld.exec_command("make -j$(nproc) --directory=" + bld.env.CRYPTOPP_DIR)
+    bld.exec_command("make -j$(nproc) --directory=" + bld.path.find_or_declare('../../modules/cryptopp').abspath())

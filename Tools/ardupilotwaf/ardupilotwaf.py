@@ -266,6 +266,11 @@ def ap_program(bld,
     if not program_name:
         program_name = bld.path.name
 
+    if bld.env.HAS_CRYPTOPP:
+        crypt_dir = bld.srcnode.find_dir('modules/cryptopp')
+        bld.env.LIB += ['cryptopp']
+        bld.env.LIBPATH += [crypt_dir.abspath()]
+
     if use_legacy_defines:
         kw['defines'].extend(get_legacy_defines(bld.path.name, bld))
 
@@ -326,7 +331,7 @@ def ap_stlib(bld, **kw):
     kw['features'] = kw.get('features', []) + ['cxx', 'cxxstlib']
     kw['target'] = kw['name']
     kw['source'] = []
-
+    
     bld.stlib(**kw)
 
 _created_program_dirs = set()
