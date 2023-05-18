@@ -60,22 +60,22 @@
 #include "MissionItemProtocol_Rally.h"
 #include "MissionItemProtocol_Fence.h"
 
-#if CRYPTOPP
-    #include <aes.h>
-    #define MAVLINK_CORE_HEADER_LEN 9
-    #define MAVLINK_SIGNATURE_BLOCK_LEN 13
-    #define MAVLINK_CHECKSUM_LEN 2
-    #include <string.h>
+#ifdef CRYPTOPP
+#include "cryptlib.h"
+#include "rijndael.h"
+#include "modes.h"
+#include "files.h"
+#include "osrng.h"
+#include "hex.h"
 
-    static void xor_crypto(char* message, int start_pos, int len)
-    {
-        char key = 'X';
-    
-        for (int i = start_pos; i < len; i++)
-        {
-            message[i] = message[i] ^ key;
-        }
-    }
+using namespace CryptoPP;
+
+const unsigned char ckey[] = { 0x6C, 0xB9, 0xD7, 0x91, 0x97, 0x9D, 0x37, 0x20, 0x7E, 0x6D, 0x52, 0xF2, 0xBC, 0x0F, 0xB6, 0x28 };
+
+const unsigned char civ[] = { 0x0F, 0xDB, 0x87, 0x60, 0x18, 0x1F, 0xF3, 0xCE, 0x2B, 0xB0, 0x7A, 0x54, 0x06, 0x33, 0x59, 0x81 };
+
+SecByteBlock keyGCS(reinterpret_cast<const byte*>(&ckey), 16);
+SecByteBlock ivGCS(reinterpret_cast<const byte*>(&civ), 16);
 #endif
 
 #include <stdio.h>
@@ -1519,13 +1519,37 @@ void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
                                  const mavlink_message_t &msg)
 {
     #if CRYPTOPP
-        int len = msg.len;
-        char* msg_raw = new char[sizeof(uint64_t[len])];
-        memcpy(msg_raw, msg.payload64, sizeof(uint64_t[len]));
-        
-        xor_crypto(msg_raw, 0, len);
+        try
+        {
+            std::string recovered;
 
-        memcpy((void*)msg.payload64, msg_raw, sizeof(uint64_t[len]));
+            char* cmsg = new char[sizeof(msg.payload64)];
+            memcpy(cmsg, msg.payload64, sizeof(msg.payload64));
+            std::string cipher(cmsg, sizeof(msg.payload64));
+
+            int num = 272 - cipher.length();
+            for(int i = 0;i < num;++i)
+            {
+                cipher.push_back('0');
+            }
+
+            CBC_Mode< AES >::Decryption d;
+            d.SetKeyWithIV(keyGCS, keyGCS.size(), ivGCS);
+
+            StringSource s(cipher, true, 
+                new StreamTransformationFilter(d,
+                    new StringSink(recovered),
+                    BlockPaddingSchemeDef::BlockPaddingScheme::ZEROS_PADDING
+                ) 
+            ); 
+
+            memcpy((void*)msg.payload64, recovered.data(), recovered.length());
+        }
+        catch(const Exception& e)
+        {
+            std::cerr << "Decryption exception " << e.what() << std::endl;
+            abort();
+        }
     #endif
 
     // we exclude radio packets because we historically used this to

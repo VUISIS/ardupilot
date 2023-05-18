@@ -10,18 +10,22 @@
 #define MAVLINK_HELPER
 #endif
 
-#if CRYPTOPP
-#include <string.h>
+#ifdef CRYPTOPP
+#include "cryptlib.h"
+#include "rijndael.h"
+#include "modes.h"
+#include "files.h"
+#include "osrng.h"
+#include "hex.h"
 
-static void xor_crypto(char* message, int len)
-{
-    char key = 'X';
-  
-    for (int i = 0; i < len; i++)
-    {
-        message[i] = message[i] ^ key;
-    }
-}
+using namespace CryptoPP;
+
+const unsigned char ckey[] = { 0x6C, 0xB9, 0xD7, 0x91, 0x97, 0x9D, 0x37, 0x20, 0x7E, 0x6D, 0x52, 0xF2, 0xBC, 0x0F, 0xB6, 0x28 };
+
+const unsigned char civ[] = { 0x0F, 0xDB, 0x87, 0x60, 0x18, 0x1F, 0xF3, 0xCE, 0x2B, 0xB0, 0x7A, 0x54, 0x06, 0x33, 0x59, 0x81 };
+
+SecByteBlock keyML(reinterpret_cast<const byte*>(&ckey), 16);
+SecByteBlock ivML(reinterpret_cast<const byte*>(&civ), 16);
 #endif
 
 #include "mavlink_sha256.h"
@@ -329,71 +333,97 @@ MAVLINK_HELPER void _mav_finalize_message_chan_send(mavlink_channel_t chan, uint
 						    uint8_t min_length, uint8_t length, uint8_t crc_extra)
 {
 #if CRYPTOPP
-    char* raw = (char*)packet;
-	xor_crypto(raw, length);
+	try
+    {
+        std::string cipher;
+        std::string plain(packet, length);
 
-	uint16_t checksum;
-	uint8_t buf[MAVLINK_NUM_HEADER_BYTES];
-	uint8_t ck[2];
-	mavlink_status_t *status = mavlink_get_channel_status(chan);
-        uint8_t header_len = MAVLINK_CORE_HEADER_LEN;
-	uint8_t signature_len = 0;
-	uint8_t signature[MAVLINK_SIGNATURE_BLOCK_LEN];
-	bool mavlink1 = (status->flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1) != 0;
-	bool signing = 	(!mavlink1) && status->signing && (status->signing->flags & MAVLINK_SIGNING_FLAG_SIGN_OUTGOING);
+		int num = 272 - plain.length();
+		for(int i = 0;i < num;++i)
+		{
+			plain.append('0');
+		}
 
-        if (mavlink1) {
-            length = min_length;
-            if (msgid > 255) {
-                // can't send 16 bit messages
-                _mav_parse_error(status);
-                return;
-            }
-            header_len = MAVLINK_CORE_HEADER_MAVLINK1_LEN;
-            buf[0] = MAVLINK_STX_MAVLINK1;
-            buf[1] = length;
-            buf[2] = status->current_tx_seq;
-            buf[3] = mavlink_system.sysid;
-            buf[4] = mavlink_system.compid;
-            buf[5] = msgid & 0xFF;
-        } else {
-	    uint8_t incompat_flags = 0;
-	    if (signing) {
-		incompat_flags |= MAVLINK_IFLAG_SIGNED;
-	    }
-            length = _mav_trim_payload(raw, length);
-            buf[0] = MAVLINK_STX;
-            buf[1] = length;
-            buf[2] = incompat_flags;
-            buf[3] = 0; // compat_flags
-            buf[4] = status->current_tx_seq;
-            buf[5] = mavlink_system.sysid;
-            buf[6] = mavlink_system.compid;
-            buf[7] = msgid & 0xFF;
-            buf[8] = (msgid >> 8) & 0xFF;
-            buf[9] = (msgid >> 16) & 0xFF;
-        }
-	status->current_tx_seq++;
-	checksum = crc_calculate((const uint8_t*)&buf[1], header_len);
-	crc_accumulate_buffer(&checksum, raw, length);
-	crc_accumulate(crc_extra, &checksum);
-	ck[0] = (uint8_t)(checksum & 0xFF);
-	ck[1] = (uint8_t)(checksum >> 8);
+        CBC_Mode< AES >::Encryption e;
+        e.SetKeyWithIV(keyML, keyML.size(), ivML);
 
-	if (signing) {
-		// possibly add a signature
-		signature_len = mavlink_sign_packet(status->signing, signature, buf, header_len+1,
-						    (const uint8_t *)raw, length, ck);
-	}
-	
-	MAVLINK_START_UART_SEND(chan, header_len + 3 + (uint16_t)length + (uint16_t)signature_len);
-	_mavlink_send_uart(chan, (const char *)buf, header_len+1);
-	_mavlink_send_uart(chan, raw, length);
-	_mavlink_send_uart(chan, (const char *)ck, 2);
-	if (signature_len != 0) {
-		_mavlink_send_uart(chan, (const char *)signature, signature_len);
-	}
-	MAVLINK_END_UART_SEND(chan, header_len + 3 + (uint16_t)length + (uint16_t)signature_len);
+        StringSource s(plain, true, 
+            new StreamTransformationFilter(e,
+                new StringSink(cipher),
+				BlockPaddingSchemeDef::BlockPaddingScheme::ONE_AND_ZEROS_PADDING 
+            ) 
+        ); 
+
+        char* raw = cipher.data();
+
+		uint16_t checksum;
+		uint8_t buf[MAVLINK_NUM_HEADER_BYTES];
+		uint8_t ck[2];
+		mavlink_status_t *status = mavlink_get_channel_status(chan);
+			uint8_t header_len = MAVLINK_CORE_HEADER_LEN;
+		uint8_t signature_len = 0;
+		uint8_t signature[MAVLINK_SIGNATURE_BLOCK_LEN];
+		bool mavlink1 = (status->flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1) != 0;
+		bool signing = 	(!mavlink1) && status->signing && (status->signing->flags & MAVLINK_SIGNING_FLAG_SIGN_OUTGOING);
+
+			if (mavlink1) {
+				length = min_length;
+				if (msgid > 255) {
+					// can't send 16 bit messages
+					_mav_parse_error(status);
+					return;
+				}
+				header_len = MAVLINK_CORE_HEADER_MAVLINK1_LEN;
+				buf[0] = MAVLINK_STX_MAVLINK1;
+				buf[1] = length;
+				buf[2] = status->current_tx_seq;
+				buf[3] = mavlink_system.sysid;
+				buf[4] = mavlink_system.compid;
+				buf[5] = msgid & 0xFF;
+			} else {
+			uint8_t incompat_flags = 0;
+			if (signing) {
+			incompat_flags |= MAVLINK_IFLAG_SIGNED;
+			}
+				length = _mav_trim_payload(raw, length);
+				buf[0] = MAVLINK_STX;
+				buf[1] = length;
+				buf[2] = incompat_flags;
+				buf[3] = 0; // compat_flags
+				buf[4] = status->current_tx_seq;
+				buf[5] = mavlink_system.sysid;
+				buf[6] = mavlink_system.compid;
+				buf[7] = msgid & 0xFF;
+				buf[8] = (msgid >> 8) & 0xFF;
+				buf[9] = (msgid >> 16) & 0xFF;
+			}
+		status->current_tx_seq++;
+		checksum = crc_calculate((const uint8_t*)&buf[1], header_len);
+		crc_accumulate_buffer(&checksum, raw, length);
+		crc_accumulate(crc_extra, &checksum);
+		ck[0] = (uint8_t)(checksum & 0xFF);
+		ck[1] = (uint8_t)(checksum >> 8);
+
+		if (signing) {
+			// possibly add a signature
+			signature_len = mavlink_sign_packet(status->signing, signature, buf, header_len+1,
+								(const uint8_t *)raw, length, ck);
+		}
+		
+		MAVLINK_START_UART_SEND(chan, header_len + 3 + (uint16_t)length + (uint16_t)signature_len);
+		_mavlink_send_uart(chan, (const char *)buf, header_len+1);
+		_mavlink_send_uart(chan, raw, length);
+		_mavlink_send_uart(chan, (const char *)ck, 2);
+		if (signature_len != 0) {
+			_mavlink_send_uart(chan, (const char *)signature, signature_len);
+		}
+		MAVLINK_END_UART_SEND(chan, header_len + 3 + (uint16_t)length + (uint16_t)signature_len);
+    }
+    catch(const Exception& e)
+    {
+        std::cerr << "Encryption exception " << e.what() << std::endl;
+		abort();
+    }
 #else
 	uint16_t checksum;
 	uint8_t buf[MAVLINK_NUM_HEADER_BYTES];
