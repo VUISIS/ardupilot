@@ -338,23 +338,17 @@ MAVLINK_HELPER void _mav_finalize_message_chan_send(mavlink_channel_t chan, uint
         std::string cipher;
         std::string plain(packet, length);
 
-		int num = 272 - plain.length();
-		for(int i = 0;i < num;++i)
-		{
-			plain.append('0');
-		}
-
-        CBC_Mode< AES >::Encryption e;
+        CTR_Mode< AES >::Encryption e;
         e.SetKeyWithIV(keyML, keyML.size(), ivML);
 
         StringSource s(plain, true, 
             new StreamTransformationFilter(e,
-                new StringSink(cipher),
-				BlockPaddingSchemeDef::BlockPaddingScheme::ONE_AND_ZEROS_PADDING 
+                new StringSink(cipher)
             ) 
         ); 
 
-        char* raw = cipher.data();
+        const char* raw = cipher.data();
+		length = cipher.length();
 
 		uint16_t checksum;
 		uint8_t buf[MAVLINK_NUM_HEADER_BYTES];

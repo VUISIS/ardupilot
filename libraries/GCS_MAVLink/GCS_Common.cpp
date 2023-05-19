@@ -1522,69 +1522,94 @@ void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
         try
         {
             std::string recovered;
+            char* tempmsg = new char[msg.len*8];
+            memcpy(tempmsg, &msg.payload64, msg.len*8);
+            std::string cipher(tempmsg);
 
-            char* cmsg = new char[sizeof(msg.payload64)];
-            memcpy(cmsg, msg.payload64, sizeof(msg.payload64));
-            std::string cipher(cmsg, sizeof(msg.payload64));
-
-            int num = 272 - cipher.length();
-            for(int i = 0;i < num;++i)
-            {
-                cipher.push_back('0');
-            }
-
-            CBC_Mode< AES >::Decryption d;
+            CTR_Mode< AES >::Decryption d;
             d.SetKeyWithIV(keyGCS, keyGCS.size(), ivGCS);
 
             StringSource s(cipher, true, 
                 new StreamTransformationFilter(d,
-                    new StringSink(recovered),
-                    BlockPaddingSchemeDef::BlockPaddingScheme::ZEROS_PADDING
+                    new StringSink(recovered)
                 ) 
             ); 
 
-            memcpy((void*)msg.payload64, recovered.data(), recovered.length());
+            memcpy((void*)&msg.payload64, (char*)recovered.data(), recovered.length());
+            // we exclude radio packets because we historically used this to
+            // make it possible to use the CLI over the radio
+            if (msg.msgid != MAVLINK_MSG_ID_RADIO && msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
+                mavlink_active |= (1U<<(chan-MAVLINK_COMM_0));
+            }
+            const auto mavlink_protocol = uartstate->get_protocol();
+            if (!(status.flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1) &&
+                (status.flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1) &&
+                (mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLink2 ||
+                mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLinkHL)) {
+                // if we receive any MAVLink2 packets on a connection
+                // currently sending MAVLink1 then switch to sending
+                // MAVLink2
+                mavlink_status_t *cstatus = mavlink_get_channel_status(chan);
+                if (cstatus != nullptr) {
+                    cstatus->flags &= ~MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
+                }
+            }
+            if (!routing.check_and_forward(chan, msg)) {
+                // the routing code has indicated we should not handle this packet locally
+                return;
+            }
+            if (msg.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
+        #if HAL_MOUNT_ENABLED
+                // allow mounts to see the location of other vehicles
+                handle_mount_message(msg);
+        #endif
+            }
+            if (!accept_packet(status, msg)) {
+                // e.g. enforce-sysid says we shouldn't look at this packet
+                return;
+            }
+            handleMessage(msg);
         }
         catch(const Exception& e)
         {
             std::cerr << "Decryption exception " << e.what() << std::endl;
             abort();
         }
-    #endif
-
-    // we exclude radio packets because we historically used this to
-    // make it possible to use the CLI over the radio
-    if (msg.msgid != MAVLINK_MSG_ID_RADIO && msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
-        mavlink_active |= (1U<<(chan-MAVLINK_COMM_0));
-    }
-    const auto mavlink_protocol = uartstate->get_protocol();
-    if (!(status.flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1) &&
-        (status.flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1) &&
-        (mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLink2 ||
-         mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLinkHL)) {
-        // if we receive any MAVLink2 packets on a connection
-        // currently sending MAVLink1 then switch to sending
-        // MAVLink2
-        mavlink_status_t *cstatus = mavlink_get_channel_status(chan);
-        if (cstatus != nullptr) {
-            cstatus->flags &= ~MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
+    #else
+        // we exclude radio packets because we historically used this to
+        // make it possible to use the CLI over the radio
+        if (msg.msgid != MAVLINK_MSG_ID_RADIO && msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
+            mavlink_active |= (1U<<(chan-MAVLINK_COMM_0));
         }
-    }
-    if (!routing.check_and_forward(chan, msg)) {
-        // the routing code has indicated we should not handle this packet locally
-        return;
-    }
-    if (msg.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
-#if HAL_MOUNT_ENABLED
-        // allow mounts to see the location of other vehicles
-        handle_mount_message(msg);
-#endif
-    }
-    if (!accept_packet(status, msg)) {
-        // e.g. enforce-sysid says we shouldn't look at this packet
-        return;
-    }
-    handleMessage(msg);
+        const auto mavlink_protocol = uartstate->get_protocol();
+        if (!(status.flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1) &&
+            (status.flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1) &&
+            (mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLink2 ||
+            mavlink_protocol == AP_SerialManager::SerialProtocol_MAVLinkHL)) {
+            // if we receive any MAVLink2 packets on a connection
+            // currently sending MAVLink1 then switch to sending
+            // MAVLink2
+            mavlink_status_t *cstatus = mavlink_get_channel_status(chan);
+            if (cstatus != nullptr) {
+                cstatus->flags &= ~MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
+            }
+        }
+        if (!routing.check_and_forward(chan, msg)) {
+            // the routing code has indicated we should not handle this packet locally
+            return;
+        }
+        if (msg.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
+    #if HAL_MOUNT_ENABLED
+            // allow mounts to see the location of other vehicles
+            handle_mount_message(msg);
+    #endif
+        }
+        if (!accept_packet(status, msg)) {
+            // e.g. enforce-sysid says we shouldn't look at this packet
+            return;
+        }
+        handleMessage(msg);
+    #endif
 }
 
 void
