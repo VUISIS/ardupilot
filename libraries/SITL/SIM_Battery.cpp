@@ -68,6 +68,8 @@ static const struct {
     { 0.01,  0.01},
     { 0.001, 0.001 }};
 
+static const float rate = 46.67;
+
 /*
   use table to get resting voltage from remaining capacity
  */
@@ -137,7 +139,7 @@ void Battery::set_current(float current)
         dt = 0;
     }
     last_us = now;
-    float delta_Ah = current * dt / 3600;
+    float delta_Ah = rate * dt / 3600;
     remaining_Ah -= delta_Ah;
     remaining_Ah = MAX(0, remaining_Ah);
 

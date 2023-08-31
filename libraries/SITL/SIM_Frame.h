@@ -85,7 +85,7 @@ private:
      */
     const struct Model {
         // model mass kg
-        float mass = 3.0;
+        float mass = 15.0;
 
         // diameter of model
         float diagonal_size = 0.35;
@@ -105,7 +105,7 @@ private:
         float maxVoltage = 4.2*3;
 
         // battery capacity in Ah. Use zero for unlimited
-        float battCapacityAh = 0.0;
+        float battCapacityAh = 2.2;
 
         // CTUN.ThO at hover at refAlt
         float hoverThrOut = 0.39;

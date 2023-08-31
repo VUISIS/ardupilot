@@ -20,12 +20,15 @@
 #include <AP_Motors/AP_Motors.h>
 #include <AP_Baro/AP_Baro.h>
 #include <AP_Filesystem/AP_Filesystem.h>
+#include <AP_HAL/AP_HAL.h>
 
 #include <stdio.h>
 #include <sys/stat.h>
 
 
 using namespace SITL;
+
+const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 
 static Motor quad_plus_motors[] =
 {
@@ -491,6 +494,8 @@ void Frame::init(const char *frame_str, Battery *_battery)
 #endif
     mass = model.mass;
 
+    hal.console->printf("Mass: %.3f\n", model.mass);
+
     const float drag_force = model.mass * GRAVITY_MSS * tanf(radians(model.refAngle));
 
     const float cos_tilt = cosf(radians(model.refAngle));
@@ -523,6 +528,8 @@ void Frame::init(const char *frame_str, Battery *_battery)
     float power_factor = hover_power / hover_thrust;
 
     battery->setup(model.battCapacityAh, model.refBatRes, model.maxVoltage);
+
+    hal.console->printf("Current: %.3f, Voltage: %.3f\n", model.battCapacityAh, model.maxVoltage);
 
     if (uint8_t(model.num_motors) != num_motors) {
         ::printf("Warning model expected %u motors and got %u\n", uint8_t(model.num_motors), num_motors);
